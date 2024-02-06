@@ -1,0 +1,13 @@
+logging:
+  level:
+    by.bsuir.kdc: debug
+
+tgt:
+  duration: 86400  # 1 day in seconds
+
+tgs:
+  id: "tgs_id"
+  duration: 1800  # 30 min in seconds
+
+kdc:
+  key: "kdcSecret"
