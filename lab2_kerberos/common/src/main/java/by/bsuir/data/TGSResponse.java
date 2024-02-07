@@ -11,6 +11,6 @@ import lombok.NoArgsConstructor;
 @AllArgsConstructor
 public class TGSResponse {
 
-    private byte[] tgs;
+    private String tgs;
     private String clientServiceSessionKey;
 }

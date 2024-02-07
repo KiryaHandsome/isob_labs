@@ -9,6 +9,7 @@ import by.bsuir.data.TGSRequest;
 import by.bsuir.data.TGSResponse;
 import by.bsuir.des.EncryptionUtils;
 import by.bsuir.util.JsonUtil;
+import org.apache.tomcat.util.codec.binary.Base64;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 import org.springframework.boot.CommandLineRunner;
@@ -30,12 +31,12 @@ public class ClientApplication {
 
     private static final Logger log = LoggerFactory.getLogger(ClientApplication.class);
     private final String clientName = "client";
-    private final String clientSecretKey = "pswd";
-    private final String serviceName = "service";
-    private final String authUrl = "http://localhost:8080/authenticate";
-    private final String serviceTicketUrl = "http://localhost:8080/grant-ticket";
-    private final String serviceUrl = "http://localhost:8082/client-auth";
-    private final String checkServiceUrl = "http://localhost:8082/check";
+    private static final String clientSecretKey = "clientSecret";
+    private static final String serviceName = "service";
+    private static final String authUrl = "http://localhost:8080/authenticate";
+    private static final String serviceTicketUrl = "http://localhost:8080/grant-ticket";
+    private static final String serviceUrl = "http://localhost:8082/client-auth";
+    private static final String checkServiceUrl = "http://localhost:8082/check";
     private final RestTemplate restTemplate = new RestTemplate();
 
     public static void main(String[] args) {
@@ -60,7 +61,7 @@ public class ClientApplication {
         var request = new AuthRequest(clientName);
         ResponseEntity<byte[]> response = restTemplate.postForEntity(authUrl, request, byte[].class);
         AuthResponse authResponse = decryptAndParseFromJson(response.getBody(), clientSecretKey, AuthResponse.class);
-        log.info("Auth response: Tgt={}, sessionKey={}", new String(authResponse.tgt()), authResponse.sessionKey());
+        log.info("Auth response: Tgt={}, sessionKey={}", authResponse.tgt(), authResponse.sessionKey());
         return authResponse;
     }
 
@@ -69,16 +70,16 @@ public class ClientApplication {
         TGSRequest tgsRequest = buildTgsRequest(authResponse.tgt(), authBlock, authResponse.sessionKey());
         ResponseEntity<byte[]> tgsResponseEntity = restTemplate.postForEntity(serviceTicketUrl, tgsRequest, byte[].class);
         TGSResponse response = decryptAndParseFromJson(tgsResponseEntity.getBody(), authResponse.sessionKey(), TGSResponse.class);
-        log.info("Tgs response: Tgs={}, clientServiceSK={}", new String(response.getTgs()), response.getClientServiceSessionKey());
+        log.info("Tgs response: Tgs={}, clientServiceSK={}", response.getTgs(), response.getClientServiceSessionKey());
         return response;
     }
 
     private ServiceResponse getServiceConsent(TGSResponse tgsResponse, AuthBlock authBlock) {
         String clientServiceSessionKey = tgsResponse.getClientServiceSessionKey();
         String authBlockJson = JsonUtil.toJson(authBlock);
-        ServiceRequest serviceRequest = new ServiceRequest(tgsResponse.getTgs(), EncryptionUtils.encrypt(authBlockJson.getBytes(), clientServiceSessionKey));
-        ResponseEntity<ServiceResponse> serviceResponseEntity = restTemplate.postForEntity(serviceUrl, serviceRequest, ServiceResponse.class);
-        return serviceResponseEntity.getBody();
+        ServiceRequest serviceRequest = new ServiceRequest(tgsResponse.getTgs(), Base64.encodeBase64String(EncryptionUtils.encrypt(authBlockJson.getBytes(), clientServiceSessionKey)));
+        ResponseEntity<byte[]> serviceResponseEntity = restTemplate.postForEntity(serviceUrl, serviceRequest, byte[].class);
+        return JsonUtil.fromJson(EncryptionUtils.decrypt(serviceResponseEntity.getBody(), clientServiceSessionKey), ServiceResponse.class);
     }
 
     private void checkTime(ServiceResponse serviceResponse, AuthBlock authBlock) {
@@ -97,7 +98,7 @@ public class ClientApplication {
         byte[] dataToSend = EncryptionUtils.encrypt("Hello from client!!!".getBytes(), clientServiceSessionKey);
         HttpHeaders headers = new HttpHeaders();
         headers.set("client", clientName);
-        HttpEntity<String> entity = new HttpEntity<>(new String(dataToSend), headers);
+        HttpEntity<byte[]> entity = new HttpEntity<>(dataToSend, headers);
         ResponseEntity<byte[]> responseEntity = restTemplate.exchange(
                 checkServiceUrl,
                 HttpMethod.POST,
@@ -112,11 +113,11 @@ public class ClientApplication {
         return new AuthBlock(LocalDateTime.now(), clientName);
     }
 
-    private TGSRequest buildTgsRequest(byte[] tgt, AuthBlock authBlock, String sessionKey) {
+    private TGSRequest buildTgsRequest(String tgt, AuthBlock authBlock, String sessionKey) {
         return TGSRequest.builder()
                 .service(serviceName)
                 .tgt(tgt)
-                .authBlock(EncryptionUtils.encrypt(JsonUtil.toJson(authBlock).getBytes(), sessionKey))
+                .authBlock(Base64.encodeBase64String(EncryptionUtils.encrypt(JsonUtil.toJson(authBlock).getBytes(), sessionKey)))
                 .build();
     }
 

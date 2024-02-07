@@ -9,6 +9,6 @@ import lombok.NoArgsConstructor;
 @AllArgsConstructor
 public class ServiceRequest {
 
-    private byte[] tgs;
-    private byte[] authBlock;
+    private String tgs;
+    private String authBlock;
 }

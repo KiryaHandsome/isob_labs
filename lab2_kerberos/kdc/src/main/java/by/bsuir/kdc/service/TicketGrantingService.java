@@ -8,6 +8,7 @@ import by.bsuir.data.TicketGrantingTicket;
 import by.bsuir.des.EncryptionUtils;
 import by.bsuir.util.JsonUtil;
 import lombok.RequiredArgsConstructor;
+import org.apache.tomcat.util.codec.binary.Base64;
 import org.springframework.beans.factory.annotation.Value;
 import org.springframework.stereotype.Service;
 
@@ -22,12 +23,12 @@ public class TicketGrantingService {
     private final KDCDatabase kdcDatabase;
 
     public byte[] grant(TGSRequest request) {
-        byte[] tgtEncrypted = request.getTgt();
+        byte[] tgtEncrypted = Base64.decodeBase64(request.getTgt());
         String tgtDecrypted = EncryptionUtils.decrypt(tgtEncrypted, kdcDatabase.getSecret("kdc"));
         TicketGrantingTicket tgt = JsonUtil.fromJson(tgtDecrypted, TicketGrantingTicket.class);
 
         String clientTgsSessionKey = kdcDatabase.getSessionKey(tgt.getClient());
-        String authBlockJson = EncryptionUtils.decrypt(request.getAuthBlock(), clientTgsSessionKey);
+        String authBlockJson = EncryptionUtils.decrypt(Base64.decodeBase64(request.getAuthBlock()), clientTgsSessionKey);
         AuthBlock authBlock = JsonUtil.fromJson(authBlockJson, AuthBlock.class);
 
         checkTgt(tgt, authBlock.client());
@@ -40,8 +41,8 @@ public class TicketGrantingService {
                 .service(request.getService())
                 .client(authBlock.client())
                 .build();
-        byte[] tgsEncrypted = EncryptionUtils.encrypt(JsonUtil.toJson(tgs).getBytes(), kdcDatabase.getSecret(request.getService()));
-        TGSResponse response = new TGSResponse(tgsEncrypted, clientServiceSessionKey);
+        byte[] tgsEncrypted = EncryptionUtils.encrypt(JsonUtil.toJson(tgs).getBytes(), kdcDatabase.getSecret("tgs_service"));
+        TGSResponse response = new TGSResponse(Base64.encodeBase64String(tgsEncrypted), clientServiceSessionKey);
 
         return EncryptionUtils.encrypt(JsonUtil.toJson(response).getBytes(), clientTgsSessionKey);
     }

@@ -12,6 +12,6 @@ import lombok.NoArgsConstructor;
 public class TGSRequest {
 
     private String service;
-    private byte[] tgt;
-    private byte[] authBlock;
+    private String tgt;
+    private String authBlock;
 }

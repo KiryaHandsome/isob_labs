@@ -6,6 +6,7 @@ import by.bsuir.data.TicketGrantingTicket;
 import by.bsuir.des.EncryptionUtils;
 import by.bsuir.util.JsonUtil;
 import lombok.RequiredArgsConstructor;
+import org.apache.tomcat.util.codec.binary.Base64;
 import org.springframework.beans.factory.annotation.Value;
 import org.springframework.stereotype.Service;
 
@@ -21,9 +22,6 @@ public class AuthService {
     @Value("${tgs.id}")
     private String tgs;
 
-    @Value("${kdc.key}")
-    private String kdcKey;
-
     private final KDCDatabase kdcDatabase;
 
     public byte[] authenticate(AuthRequest request) {
@@ -33,9 +31,9 @@ public class AuthService {
         }
         String sessionKey = generateSessionKey(client);
         TicketGrantingTicket tgt = generateTGT(request.client(), sessionKey);
-        byte[] tgtEncrypted = EncryptionUtils.encrypt(JsonUtil.toJson(tgt).getBytes(), kdcKey);
+        byte[] tgtEncrypted = EncryptionUtils.encrypt(JsonUtil.toJson(tgt).getBytes(), kdcDatabase.getSecret("kdc"));
         kdcDatabase.addSessionKey(client, sessionKey);
-        var response = new AuthResponse(tgtEncrypted, sessionKey);
+        var response = new AuthResponse(Base64.encodeBase64String(tgtEncrypted), sessionKey);
         return EncryptionUtils.encrypt(JsonUtil.toJson(response).getBytes(), kdcDatabase.getSecret(client));
     }
 
