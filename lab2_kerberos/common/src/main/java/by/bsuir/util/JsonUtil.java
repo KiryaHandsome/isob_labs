@@ -1,5 +1,6 @@
 package by.bsuir.util;
 
+import com.fasterxml.jackson.core.json.JsonReadFeature;
 import com.fasterxml.jackson.databind.ObjectMapper;
 import com.fasterxml.jackson.datatype.jsr310.JavaTimeModule;
 import lombok.SneakyThrows;
@@ -13,6 +14,7 @@ public class JsonUtil {
     static {
        objectMapper = new ObjectMapper();
        objectMapper.registerModule(new JavaTimeModule());
+       objectMapper.enable(JsonReadFeature.ALLOW_LEADING_ZEROS_FOR_NUMBERS.mappedFeature());
     }
 
     @SneakyThrows
