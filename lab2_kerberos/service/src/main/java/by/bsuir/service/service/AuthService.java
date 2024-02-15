@@ -11,6 +11,8 @@ import org.apache.tomcat.util.codec.binary.Base64;
 import org.springframework.beans.factory.annotation.Value;
 import org.springframework.stereotype.Service;
 
+import java.time.LocalDateTime;
+
 @Service
 @RequiredArgsConstructor
 public class AuthService {
@@ -23,7 +25,9 @@ public class AuthService {
     public byte[] authenticateClient(ServiceRequest serviceRequest) {
         String tgsJson = EncryptionUtils.decrypt(Base64.decodeBase64(serviceRequest.getTgs()), tgsServiceSecretKey);
         GrantingServiceTicket ticket = JsonUtil.fromJson(tgsJson, GrantingServiceTicket.class);
-
+        if (!ticket.getTime().plusSeconds(ticket.getValidityPeriod()).isBefore(LocalDateTime.now())) {
+            throw new RuntimeException("TGS expired");
+        }
         String clientServiceSessionKey = ticket.getClientServiceSessionKey();
         String authBlockJson = EncryptionUtils.decrypt(Base64.decodeBase64(serviceRequest.getAuthBlock()), clientServiceSessionKey);
         AuthBlock authBlock = JsonUtil.fromJson(authBlockJson, AuthBlock.class);
